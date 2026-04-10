@@ -309,7 +309,7 @@ Do you have a Firecrawl API key, or do you need to sign up for one?
 
 ---
 
-**Neil:** fc-198a6b1cebf34096b5e07b7ed69ee87f
+**Neil:** *(Firecrawl API key)*
 
 **Claude:** Got it — I'll use that when we build. A word of caution: avoid sharing that key publicly (GitHub, etc.) — we'll store it in a `.env` file and make sure it's gitignored.
 

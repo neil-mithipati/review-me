@@ -145,7 +145,7 @@ Planning session for **review-me**, an agentic product review app that aggregate
 
 **Claude:** Firecrawl is the most popular choice in the AI/agent space — purpose-built for LLM apps, returns clean markdown, has an official MCP server.
 
-**User:** fc-198a6b1cebf34096b5e07b7ed69ee87f *(Firecrawl API key)*
+**User:** *(Firecrawl API key)*
 
 **Claude:** Noted — will store in `.env`. Locked in: Claude Agents SDK, Firecrawl MCP, full parallelism, 24h SQLite cache.
 
