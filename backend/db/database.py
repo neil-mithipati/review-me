@@ -1,0 +1,96 @@
+import aiosqlite
+import json
+from datetime import datetime, timedelta
+from pathlib import Path
+
+DB_PATH = Path(__file__).parent.parent / "review_me.db"
+CACHE_TTL_HOURS = 72
+
+
+async def init_db():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS cache (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                product TEXT NOT NULL,
+                source TEXT NOT NULL,
+                result_json TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(product, source)
+            )
+        """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS wishlist (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                product_name TEXT NOT NULL,
+                verdict TEXT NOT NULL,
+                review_id TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        await db.commit()
+
+
+async def get_cached(product: str, source: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT result_json, created_at FROM cache WHERE product = ? AND source = ?",
+            (product.lower().strip(), source),
+        ) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                return None
+            created_at = datetime.fromisoformat(row["created_at"])
+            if datetime.utcnow() - created_at > timedelta(hours=CACHE_TTL_HOURS):
+                return None
+            return json.loads(row["result_json"])
+
+
+async def set_cached(product: str, source: str, result: dict):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO cache (product, source, result_json, created_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(product, source) DO UPDATE SET
+                result_json = excluded.result_json,
+                created_at = excluded.created_at
+            """,
+            (product.lower().strip(), source, json.dumps(result), datetime.utcnow().isoformat()),
+        )
+        await db.commit()
+
+
+async def get_wishlist() -> list[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT id, product_name, verdict, review_id, created_at FROM wishlist ORDER BY created_at DESC"
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(row) for row in rows]
+
+
+async def add_to_wishlist(product_name: str, verdict: str, review_id: str) -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "INSERT INTO wishlist (product_name, verdict, review_id) VALUES (?, ?, ?)",
+            (product_name, verdict, review_id),
+        )
+        await db.commit()
+        item_id = cursor.lastrowid
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT id, product_name, verdict, review_id, created_at FROM wishlist WHERE id = ?",
+            (item_id,),
+        ) as cur:
+            row = await cur.fetchone()
+            return dict(row)
+
+
+async def remove_from_wishlist(item_id: int) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("DELETE FROM wishlist WHERE id = ?", (item_id,))
+        await db.commit()
+        return cursor.rowcount > 0

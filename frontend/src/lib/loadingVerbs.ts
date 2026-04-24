@@ -1,0 +1,40 @@
+export const LOADING_VERBS: Record<string, string[]> = {
+  orchestrator: [
+    "opening a portal to dimension C-137",
+    "consulting the Citadel of Ricks",
+    "crossing to the dark side",
+    "collapsing into a black hole",
+    "warping through hyperspace",
+    "getting schwifty with the data",
+    "may the data be with you",
+    "activating the Death Star",
+  ],
+  wirecutter: [
+    "checking the front page",
+    "solving the Wordle",
+    "publishing the Sunday edition",
+    "hunting for the Connections",
+    "playing the Mini crossword",
+  ],
+  cnet: [
+    "booting up the mainframe",
+    "loading the dial-up",
+    "connecting to the internet",
+    "defragmenting the results",
+    "buffering at 56k",
+  ],
+  amazon: [
+    "stacking boxes in the warehouse",
+    "checking Jeff's bookshelf",
+    "reading between the pages",
+    "shipping from Seattle",
+    "two-day priming the data",
+  ],
+  reddit: [
+    "diving into the rabbit hole",
+    "asking the hive mind",
+    "sorting by controversial",
+    "waiting for karma",
+    "scrolling past the memes",
+  ],
+};

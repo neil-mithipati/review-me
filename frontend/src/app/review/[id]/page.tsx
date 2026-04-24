@@ -1,0 +1,110 @@
+"use client";
+
+import { useParams, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { ActionButtons } from "@/components/ActionButtons";
+import { SearchInput } from "@/components/SearchInput";
+import { SourceCard } from "@/components/SourceCard";
+import { VerdictCard } from "@/components/VerdictCard";
+import { clarifyReview, startReview, streamReview } from "@/lib/api";
+import type { SourceName, SourceState, VerdictState } from "@/lib/types";
+
+const SOURCES: SourceName[] = ["wirecutter", "cnet", "amazon", "reddit"];
+
+const initialSources = (): Record<SourceName, SourceState> => ({
+  wirecutter: { status: "loading" },
+  cnet: { status: "loading" },
+  amazon: { status: "loading" },
+  reddit: { status: "loading" },
+});
+
+export default function ReviewPage() {
+  const params = useParams();
+  const router = useRouter();
+  const reviewId = params.id as string;
+
+  const [productName, setProductName] = useState("");
+  const [sources, setSources] = useState<Record<SourceName, SourceState>>(initialSources());
+  const [verdict, setVerdict] = useState<VerdictState>({ status: "loading" });
+  const cleanupRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    const cleanup = streamReview(
+      reviewId,
+      (event) => {
+        if (!productName && event.data?.product_found != null) {
+          // product name comes from search params if available
+        }
+        setSources((prev) => ({
+          ...prev,
+          [event.source]: {
+            status: event.status,
+            data: event.data,
+            error: event.error,
+          },
+        }));
+      },
+      (event) => {
+        setVerdict({ status: "complete", data: event });
+      },
+      () => {
+        // stream done
+      },
+      () => {
+        setVerdict((v) =>
+          v.status === "loading" ? { status: "error" } : v
+        );
+      }
+    );
+    cleanupRef.current = cleanup;
+    return () => cleanup();
+  }, [reviewId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Extract product name from URL search params if provided
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const name = url.searchParams.get("product");
+    if (name) setProductName(decodeURIComponent(name));
+  }, []);
+
+  async function handleNewSearch(query: string) {
+    cleanupRef.current?.();
+    try {
+      const res = await startReview(query);
+      if (res.status === "running") {
+        router.push(`/review/${res.review_id}`);
+      } else if (res.status === "clarification_needed" && res.candidates?.length) {
+        // Navigate home with clarification state
+        router.push("/");
+      }
+    } catch {
+      router.push("/");
+    }
+  }
+
+  return (
+    <div className="min-h-[calc(100vh-4rem)] py-8 px-4">
+      <div className="max-w-4xl mx-auto flex flex-col gap-6">
+        <div className="flex justify-center">
+          <SearchInput onSubmit={handleNewSearch} initialValue={productName} />
+        </div>
+
+        <VerdictCard verdict={verdict} productName={productName} />
+
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-4">
+          {SOURCES.map((source) => (
+            <SourceCard key={source} source={source} state={sources[source]} />
+          ))}
+        </div>
+
+        {verdict.status === "complete" && verdict.data && (
+          <ActionButtons
+            verdictData={verdict.data}
+            productName={productName}
+            reviewId={reviewId}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
