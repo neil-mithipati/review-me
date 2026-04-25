@@ -1,7 +1,7 @@
 """Loads system prompts from .claude/agents/<name>.md, stripping YAML frontmatter."""
 from pathlib import Path
 
-_AGENTS_DIR = Path(__file__).parent.parent.parent / ".claude" / "agents"
+_AGENTS_DIR = Path(__file__).parent.parent.parent.parent / ".claude" / "agents"
 
 
 def load_system_prompt(name: str) -> str:
