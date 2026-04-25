@@ -13,6 +13,7 @@ EXTRACT_SCHEMA = {
     "type": "object",
     "properties": {
         "product_found": {"type": "boolean"},
+        "source_url": {"type": "string", "description": "Direct URL to the specific Wirecutter review page for this product"},
         "verdict_tier": {
             "type": "string",
             "description": "One of: Our Pick, Also Great, Upgrade Pick, Budget Pick, No Longer Recommended, Not Listed",
@@ -73,6 +74,7 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
 
     result = {
         "product_found": raw.get("product_found", False),
+        "source_url": raw.get("source_url") or url,
         "verdict_tier": raw.get("verdict_tier", "Not Listed"),
         "is_primary_recommendation": raw.get("is_primary_recommendation", False),
         "blurb": raw.get("blurb", ""),

@@ -126,13 +126,15 @@ export function SourceCard({ source, state, productName }: Props) {
   const { label, url } = SOURCE_META[source];
   const verb = useCyclingText(LOADING_VERBS[source] ?? [], 2000);
 
-  const searchUrl = productName
-    ? `${url}/search?q=${encodeURIComponent(productName)}`
-    : url;
+  const sourceUrl = (state.status === "complete" && state.data && "source_url" in state.data && state.data.source_url)
+    ? state.data.source_url
+    : productName
+      ? `${url}/search?q=${encodeURIComponent(productName)}`
+      : url;
 
   return (
     <a
-      href={searchUrl}
+      href={sourceUrl}
       target="_blank"
       rel="noopener noreferrer"
       className="group glass rounded-xl p-4 sm:p-5 flex flex-col gap-2 sm:gap-3 min-h-[160px] sm:min-h-[180px] transition-all duration-200 ease-out hover:bg-white/[0.08] hover:border-white/[0.18] hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/40 active:bg-white/[0.1] cursor-pointer"
@@ -153,8 +155,10 @@ export function SourceCard({ source, state, productName }: Props) {
       </div>
 
       {(state.status === "loading" || state.status === "idle") && (
-        <div className="flex-1 flex items-center">
-          <p className="text-white/25 text-xs italic transition-opacity duration-500">{verb}</p>
+        <div className="flex-1 flex flex-col gap-2 justify-center">
+          <div className="h-2.5 bg-white/[0.06] rounded animate-pulse w-3/4" />
+          <div className="h-2.5 bg-white/[0.06] rounded animate-pulse w-1/2" />
+          <p className="text-white/25 text-xs italic mt-1 transition-opacity duration-500">{verb}</p>
         </div>
       )}
 

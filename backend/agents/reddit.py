@@ -69,8 +69,10 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
             "confidence": "low",
         }
 
+    reddit_search_url = f"https://www.reddit.com/search/?q={quote_plus(product)}+review&sort=relevance&t=year"
     result = {
         "product_found": parsed.get("product_found", product_found),
+        "source_url": reddit_search_url,
         "sentiment_summary": parsed.get("sentiment_summary", ""),
         "verdict": parsed.get("verdict", "Consider"),
         "confidence": parsed.get("confidence", "low"),

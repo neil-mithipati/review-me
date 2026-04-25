@@ -13,6 +13,7 @@ EXTRACT_SCHEMA = {
     "type": "object",
     "properties": {
         "product_found": {"type": "boolean"},
+        "source_url": {"type": "string", "description": "Direct URL to the specific Amazon product listing page"},
         "star_rating": {"type": "number", "description": "Rating from 0 to 5"},
         "review_count": {"type": "integer"},
         "common_complaints": {"type": "array", "items": {"type": "string"}},
@@ -71,6 +72,7 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
 
     result = {
         "product_found": raw.get("product_found", False),
+        "source_url": raw.get("source_url") or url,
         "star_rating": raw.get("star_rating"),
         "review_count": raw.get("review_count"),
         "common_complaints": raw.get("common_complaints", []),

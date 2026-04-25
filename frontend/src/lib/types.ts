@@ -5,6 +5,7 @@ export type SourceStatus = "idle" | "loading" | "complete" | "error";
 
 export type WirecutterData = {
   product_found: boolean;
+  source_url?: string;
   verdict_tier: string;
   is_primary_recommendation: boolean;
   blurb: string;
@@ -14,6 +15,7 @@ export type WirecutterData = {
 
 export type CnetData = {
   product_found: boolean;
+  source_url?: string;
   overall_score: number | null;
   pros: string[];
   cons: string[];
@@ -23,6 +25,7 @@ export type CnetData = {
 
 export type AmazonData = {
   product_found: boolean;
+  source_url?: string;
   star_rating: number | null;
   review_count: number | null;
   common_complaints: string[];
@@ -34,6 +37,7 @@ export type AmazonData = {
 
 export type RedditData = {
   product_found: boolean;
+  source_url?: string;
   sentiment_summary: string;
   verdict: Verdict;
   confidence: Confidence;
