@@ -1,9 +1,20 @@
 import json
+import logging
+import re
 from urllib.parse import quote_plus
 import anthropic
 from firecrawl import FirecrawlApp
 from db.database import get_cached, set_cached
 from agents._loader import load_system_prompt
+
+logger = logging.getLogger(__name__)
+
+
+def _parse_json(text: str) -> dict:
+    text = text.strip()
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    return json.loads(text.strip())
 
 SOURCE = "cnet"
 
@@ -64,9 +75,11 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
         ],
     )
 
+    raw_text = message.content[0].text
     try:
-        parsed = json.loads(message.content[0].text)
+        parsed = _parse_json(raw_text)
     except (json.JSONDecodeError, IndexError, KeyError):
+        logger.warning("CNET agent JSON parse failed for '%s'. Raw: %s", product, raw_text)
         parsed = {"verdict": "Consider", "confidence": "low"}
 
     result = {

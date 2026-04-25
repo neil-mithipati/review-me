@@ -1,4 +1,6 @@
 import json
+import logging
+import re
 from urllib.parse import quote_plus
 import httpx
 import anthropic
@@ -7,8 +9,18 @@ from db.database import get_cached, set_cached
 from agents._loader import load_system_prompt
 
 SOURCE = "reddit"
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = load_system_prompt(SOURCE)
+
+
+def _parse_json(text: str) -> dict:
+    """Parse JSON from Claude response, stripping markdown code fences if present."""
+    text = text.strip()
+    # Strip ```json ... ``` or ``` ... ``` wrappers
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    return json.loads(text.strip())
 
 
 async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnthropic) -> dict:
@@ -37,7 +49,8 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
                 f"Title: {p['data']['title']}\nScore: {p['data']['score']}\n{p['data'].get('selftext', '')[:500]}"
                 for p in posts[:8]
             )
-    except Exception:
+    except Exception as e:
+        logger.warning("Reddit API request failed for '%s': %s", product, e)
         posts_text = ""
         product_found = False
 
@@ -59,9 +72,11 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
         ],
     )
 
+    raw_text = message.content[0].text
     try:
-        parsed = json.loads(message.content[0].text)
+        parsed = _parse_json(raw_text)
     except (json.JSONDecodeError, IndexError, KeyError):
+        logger.warning("Reddit agent JSON parse failed for '%s'. Raw response: %s", product, raw_text)
         parsed = {
             "product_found": product_found,
             "sentiment_summary": "Unable to determine community sentiment.",
