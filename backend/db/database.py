@@ -1,10 +1,15 @@
 import aiosqlite
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DB_PATH = Path(__file__).parent.parent / "review_me.db"
 CACHE_TTL_HOURS = 72
+
+
+def _now() -> datetime:
+    """Returns current UTC time. Extracted so tests can monkeypatch it."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 async def init_db():
@@ -42,7 +47,7 @@ async def get_cached(product: str, source: str) -> dict | None:
             if not row:
                 return None
             created_at = datetime.fromisoformat(row["created_at"])
-            if datetime.utcnow() - created_at > timedelta(hours=CACHE_TTL_HOURS):
+            if _now() - created_at > timedelta(hours=CACHE_TTL_HOURS):
                 return None
             return json.loads(row["result_json"])
 
@@ -57,7 +62,7 @@ async def set_cached(product: str, source: str, result: dict):
                 result_json = excluded.result_json,
                 created_at = excluded.created_at
             """,
-            (product.lower().strip(), source, json.dumps(result), datetime.utcnow().isoformat()),
+            (product.lower().strip(), source, json.dumps(result), _now().isoformat()),
         )
         await db.commit()
 
@@ -66,7 +71,7 @@ async def get_wishlist() -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         async with db.execute(
-            "SELECT id, product_name, verdict, review_id, created_at FROM wishlist ORDER BY created_at DESC"
+            "SELECT id, product_name, verdict, review_id, created_at FROM wishlist ORDER BY id DESC"
         ) as cursor:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]

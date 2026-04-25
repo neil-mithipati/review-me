@@ -1,4 +1,3 @@
-import os
 import json
 from urllib.parse import quote_plus
 import anthropic
@@ -33,6 +32,12 @@ EXTRACT_SCHEMA = {
 }
 
 
+def _parse_data(raw) -> dict:
+    if isinstance(raw, list):
+        return raw[0] if raw else {}
+    return raw if isinstance(raw, dict) else {}
+
+
 async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnthropic) -> dict:
     cached = await get_cached(product, SOURCE)
     if cached:
@@ -41,13 +46,13 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
     url = f"https://www.wirecutter.com/search/?q={quote_plus(product)}"
     try:
         extract_result = firecrawl.extract(
-            [url],
-            {
-                "prompt": f"Find the Wirecutter review for '{product}'. Extract the verdict tier, whether it is the primary recommendation, and any review blurb.",
-                "schema": EXTRACT_SCHEMA,
-            },
+            urls=[url],
+            prompt=f"Find the Wirecutter review for '{product}'. Extract the verdict tier (Our Pick, Also Great, Upgrade Pick, Budget Pick, No Longer Recommended, or Not Listed), whether it is the primary recommendation, and any review blurb.",
+            schema=EXTRACT_SCHEMA,
+            allow_external_links=True,
+            enable_web_search=True,
         )
-        raw = extract_result.get("data", {}) if isinstance(extract_result, dict) else {}
+        raw = _parse_data(extract_result.data if hasattr(extract_result, "data") else {})
     except Exception as e:
         raw = {"product_found": False, "error": str(e)}
 
@@ -64,7 +69,7 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
         messages=[
             {
                 "role": "user",
-                "content": f"Product: {product}\nWirecutter data: {json.dumps(raw)}\n\nReturn JSON with keys: verdict, confidence, plus all fields from the data.",
+                "content": f"Product: {product}\nWirecutter data: {json.dumps(raw)}\n\nReturn JSON with keys: verdict, confidence.",
             }
         ],
     )

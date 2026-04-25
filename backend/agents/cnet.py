@@ -1,4 +1,3 @@
-import os
 import json
 from urllib.parse import quote_plus
 import anthropic
@@ -31,6 +30,12 @@ EXTRACT_SCHEMA = {
 }
 
 
+def _parse_data(raw) -> dict:
+    if isinstance(raw, list):
+        return raw[0] if raw else {}
+    return raw if isinstance(raw, dict) else {}
+
+
 async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnthropic) -> dict:
     cached = await get_cached(product, SOURCE)
     if cached:
@@ -39,13 +44,13 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
     url = f"https://www.cnet.com/search/?query={quote_plus(product)}"
     try:
         extract_result = firecrawl.extract(
-            [url],
-            {
-                "prompt": f"Find the CNET review for '{product}'. Extract the overall score (0-10), pros, and cons.",
-                "schema": EXTRACT_SCHEMA,
-            },
+            urls=[url],
+            prompt=f"Find the CNET review for '{product}'. Extract the overall score (0-10), pros, and cons.",
+            schema=EXTRACT_SCHEMA,
+            allow_external_links=True,
+            enable_web_search=True,
         )
-        raw = extract_result.get("data", {}) if isinstance(extract_result, dict) else {}
+        raw = _parse_data(extract_result.data if hasattr(extract_result, "data") else {})
     except Exception as e:
         raw = {"product_found": False, "error": str(e)}
 

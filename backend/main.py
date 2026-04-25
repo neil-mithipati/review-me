@@ -15,6 +15,7 @@ from firecrawl import FirecrawlApp
 from pydantic import BaseModel
 
 from agents import amazon, cnet, orchestrator, reddit, wirecutter
+from evals import get_evals_for_review, run_evals
 from db.database import (
     add_to_wishlist,
     get_wishlist,
@@ -134,6 +135,16 @@ async def run_review(session: ReviewSession):
                 "source_update",
                 {"source": source_name, "status": "complete", "data": result, "error": None},
             )
+            # Fire all three LLM judges in the background — non-blocking
+            asyncio.create_task(run_evals(
+                review_id=session.review_id,
+                product=product,
+                source=source_name,
+                source_data=result,
+                verdict=result.get("verdict", "Consider"),
+                confidence=result.get("confidence", "low"),
+                claude=claude_client,
+            ))
         except Exception as e:
             session.source_status[source_name] = "error"
             session.source_error[source_name] = str(e)
@@ -289,3 +300,9 @@ async def delete_wishlist_item(item_id: int):
     if not removed:
         raise HTTPException(status_code=404, detail="Item not found")
     return {"success": True}
+
+
+@app.get("/api/review/{review_id}/evals")
+async def get_review_evals(review_id: str):
+    evals = await get_evals_for_review(review_id)
+    return {"review_id": review_id, "evals": evals}
