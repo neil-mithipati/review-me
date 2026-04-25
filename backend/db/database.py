@@ -1,9 +1,11 @@
 import aiosqlite
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent.parent / "review_me.db"
+# DATABASE_PATH env var lets Railway (or any host) point to a persistent volume
+DB_PATH = Path(os.environ.get("DATABASE_PATH", str(Path(__file__).parent.parent / "review_me.db")))
 CACHE_TTL_HOURS = 72
 
 
