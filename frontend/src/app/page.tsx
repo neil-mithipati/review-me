@@ -74,7 +74,7 @@ export default function Home() {
                   key={candidate}
                   onClick={() => handleClarify(candidate)}
                   disabled={clarifyLoading}
-                  className="text-left bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] hover:border-white/[0.16] text-white rounded-xl px-4 py-3 text-sm transition-all duration-150 disabled:opacity-50"
+                  className="text-left bg-cyan-950/20 hover:bg-cyan-900/30 border border-cyan-500/15 hover:border-cyan-400/35 text-cyan-50 rounded-xl px-4 py-3 text-sm transition-all duration-150 disabled:opacity-50"
                 >
                   {candidate}
                 </button>

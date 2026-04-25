@@ -59,7 +59,7 @@ export function SearchInput({ onSubmit, initialValue = "", loading = false }: Pr
           onChange={(e) => setValue(e.target.value)}
           placeholder={placeholder}
           disabled={loading}
-          className="w-full bg-white/[0.06] backdrop-blur-xl border border-white/[0.1] text-white placeholder-white/25 rounded-full px-6 py-4 text-base focus:outline-none focus:border-white/[0.25] focus:bg-white/[0.08] transition-all duration-150 disabled:opacity-50 pr-14"
+          className="w-full bg-cyan-950/20 backdrop-blur-xl border border-cyan-500/20 text-cyan-50 placeholder-cyan-300/25 rounded-full px-6 py-4 text-base focus:outline-none focus:border-cyan-400/50 focus:bg-cyan-950/30 transition-all duration-150 disabled:opacity-50 pr-14"
         />
         {loading && (
           <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none">
