@@ -190,6 +190,52 @@ async def test_delete_nonexistent_item_returns_404(client):
     assert resp.status_code == 404
 
 
+# ── run_review retry logic ────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_source_retried_when_eval_scores_zero(monkeypatch, tmp_path):
+    """run_source retries once when any eval judge scores 0 (non-error label)."""
+    import main
+    from main import ReviewSession, run_review
+    from tests.conftest import make_claude
+
+    db_file = tmp_path / "retry_test.db"
+    monkeypatch.setattr(dbmod, "DB_PATH", db_file)
+    await dbmod.init_db()
+
+    call_counts = {"amazon": 0}
+
+    async def fake_amazon(product, fc, claude):
+        call_counts["amazon"] += 1
+        return {"verdict": "Buy", "confidence": "high", "product_found": True,
+                "star_rating": 4.8, "review_count": 5000,
+                "common_complaints": [], "is_amazon_choice": False, "is_best_seller": False}
+
+    stub_result = {"verdict": "Buy", "confidence": "high", "product_found": True}
+
+    # Use setitem to patch individual entries in the SOURCE_AGENTS dict
+    monkeypatch.setitem(main.SOURCE_AGENTS, "amazon", fake_amazon)
+    for source in ["wirecutter", "cnet", "reddit"]:
+        monkeypatch.setitem(main.SOURCE_AGENTS, source, AsyncMock(return_value=stub_result))
+
+    # Eval always returns score 0 with a non-error label → triggers retry
+    fail_claude = make_claude('{"label": "unrelated", "score": 0.0, "explanation": "wrong product"}')
+    monkeypatch.setattr(main, "firecrawl_client", MagicMock())
+    monkeypatch.setattr(main, "claude_client", fail_claude)
+    monkeypatch.setattr(main, "orchestrator", MagicMock(run=AsyncMock(return_value={
+        "verdict": "Buy", "summary": "ok",
+        "notable_disagreements": None, "buy_link": None, "recommended_action": "buy",
+    })))
+
+    session = ReviewSession(review_id="retry-test", product_name="Sony WH-1000XM5")
+    main.reviews["retry-test"] = session
+
+    await run_review(session)
+
+    # Amazon agent should have been called twice: initial + 1 retry
+    assert call_counts["amazon"] == 2
+
+
 # ── Integration: real agent pipeline (skipped without API keys) ───────────────
 
 @pytest.mark.integration

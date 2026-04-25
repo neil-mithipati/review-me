@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #04040c;
+  --foreground: #ffffff;
 }
 
 @theme inline {
@@ -12,15 +12,62 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background-color: #04040c;
+  background-image:
+    radial-gradient(ellipse at 18% 18%, rgba(110, 86, 220, 0.13) 0%, transparent 50%),
+    radial-gradient(ellipse at 82% 78%, rgba(56, 96, 210, 0.09) 0%, transparent 45%),
+    radial-gradient(ellipse at 55% 90%, rgba(80, 50, 180, 0.06) 0%, transparent 40%);
+  background-attachment: fixed;
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  /* iOS safe area at bottom (home indicator) */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  -webkit-tap-highlight-color: transparent;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+button, a, input {
+  touch-action: manipulation;
+}
+
+/* Glass utility */
+.glass {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-heavy {
+  background: rgba(4, 4, 18, 0.6);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Animated app title */
+@keyframes title-flow {
+  0%   { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+
+.app-title {
+  background: linear-gradient(
+    90deg,
+    #c4b5fd 0%,
+    #818cf8 18%,
+    #93c5fd 36%,
+    #f0f9ff 50%,
+    #93c5fd 64%,
+    #818cf8 82%,
+    #c4b5fd 100%
+  );
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: title-flow 4s linear infinite;
+  padding-bottom: 0.15em;
+  line-height: 1.15;
 }

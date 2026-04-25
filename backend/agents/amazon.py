@@ -3,20 +3,11 @@ from urllib.parse import quote_plus
 import anthropic
 from firecrawl import FirecrawlApp
 from db.database import get_cached, set_cached
+from agents._loader import load_system_prompt
 
 SOURCE = "amazon"
 
-SYSTEM_PROMPT = """You are a product review analyst specializing in Amazon customer data.
-Given Amazon data for a product, map it to a verdict (Buy/Consider/Skip) and confidence (high/medium/low).
-
-Mapping rules:
-- star_rating >= 4.5 AND review_count >= 500 → verdict: Buy, confidence: high
-- star_rating >= 4.0 AND review_count >= 100 → verdict: Consider, confidence: medium
-- star_rating >= 4.0 but review_count < 100 → verdict: Consider, confidence: low
-- star_rating < 4.0 → verdict: Skip, confidence: medium
-- product_found=false → verdict: Consider, confidence: low
-
-Respond with a JSON object only, no explanation."""
+SYSTEM_PROMPT = load_system_prompt(SOURCE)
 
 EXTRACT_SCHEMA = {
     "type": "object",
@@ -68,7 +59,7 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
         messages=[
             {
                 "role": "user",
-                "content": f"Product: {product}\nAmazon data: {json.dumps(raw)}\n\nReturn JSON with keys: verdict, confidence.",
+                "content": f"Product: {product}\nAmazon data: {json.dumps(raw)}",
             }
         ],
     )

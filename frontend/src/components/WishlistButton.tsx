@@ -10,7 +10,7 @@ export function WishlistButton() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="text-zinc-400 hover:text-white transition-colors text-xl"
+        className="text-white/40 hover:text-white transition-colors text-lg"
         aria-label="Open wishlist"
       >
         ★

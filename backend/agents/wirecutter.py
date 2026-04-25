@@ -3,19 +3,11 @@ from urllib.parse import quote_plus
 import anthropic
 from firecrawl import FirecrawlApp
 from db.database import get_cached, set_cached
+from agents._loader import load_system_prompt
 
 SOURCE = "wirecutter"
 
-SYSTEM_PROMPT = """You are a product review analyst specializing in Wirecutter (NYT).
-Given Wirecutter data for a product, map it to a verdict (Buy/Consider/Skip) and confidence (high/medium/low).
-
-Mapping rules:
-- "Our Pick" or "Also Great" → verdict: Buy, confidence: high
-- "Upgrade Pick" or "Budget Pick" → verdict: Consider, confidence: medium
-- "No Longer Recommended" → verdict: Skip, confidence: high
-- "Not Listed" or product_found=false → verdict: Consider, confidence: low
-
-Respond with a JSON object only, no explanation."""
+SYSTEM_PROMPT = load_system_prompt(SOURCE)
 
 EXTRACT_SCHEMA = {
     "type": "object",
@@ -69,7 +61,7 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
         messages=[
             {
                 "role": "user",
-                "content": f"Product: {product}\nWirecutter data: {json.dumps(raw)}\n\nReturn JSON with keys: verdict, confidence.",
+                "content": f"Product: {product}\nWirecutter data: {json.dumps(raw)}",
             }
         ],
     )

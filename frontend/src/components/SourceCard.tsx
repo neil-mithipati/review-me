@@ -11,17 +11,17 @@ import type {
   WirecutterData,
 } from "@/lib/types";
 
-const SOURCE_META: Record<SourceName, { label: string; icon: string }> = {
-  wirecutter: { label: "Wirecutter", icon: "✂️" },
-  cnet: { label: "CNET", icon: "💻" },
-  amazon: { label: "Amazon", icon: "📦" },
-  reddit: { label: "Reddit", icon: "🔴" },
+const SOURCE_META: Record<SourceName, { label: string; url: string }> = {
+  wirecutter: { label: "Wirecutter", url: "https://www.wirecutter.com" },
+  cnet:       { label: "CNET",       url: "https://www.cnet.com" },
+  amazon:     { label: "Amazon",     url: "https://www.amazon.com" },
+  reddit:     { label: "Reddit",     url: "https://www.reddit.com" },
 };
 
 const VERDICT_CHIP: Record<string, string> = {
-  Buy: "bg-green-500/20 text-green-400",
-  Consider: "bg-amber-500/20 text-amber-400",
-  Skip: "bg-red-500/20 text-red-400",
+  Buy:     "bg-green-500/20 text-green-400",
+  Consider:"bg-amber-500/20 text-amber-400",
+  Skip:    "bg-red-500/20 text-red-400",
 };
 
 function StarRating({ rating }: { rating: number }) {
@@ -32,7 +32,7 @@ function StarRating({ rating }: { rating: number }) {
       {"★".repeat(full)}
       {half ? "½" : ""}
       {"☆".repeat(5 - full - (half ? 1 : 0))}
-      <span className="text-zinc-400 ml-1">{rating.toFixed(1)}</span>
+      <span className="text-white/40 ml-1">{rating.toFixed(1)}</span>
     </span>
   );
 }
@@ -41,7 +41,7 @@ function WirecutterContent({ data }: { data: WirecutterData }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <span className="bg-zinc-700 text-zinc-200 text-xs px-2 py-0.5 rounded">
+        <span className="bg-white/[0.08] text-white/70 text-xs px-2 py-0.5 rounded">
           {data.verdict_tier || "Not Listed"}
         </span>
         {data.is_primary_recommendation && (
@@ -49,7 +49,7 @@ function WirecutterContent({ data }: { data: WirecutterData }) {
         )}
       </div>
       {data.blurb && (
-        <p className="text-zinc-400 text-xs leading-relaxed line-clamp-3">{data.blurb}</p>
+        <p className="text-white/40 text-xs leading-relaxed line-clamp-3">{data.blurb}</p>
       )}
     </div>
   );
@@ -67,18 +67,14 @@ function CnetContent({ data }: { data: CnetData }) {
       {data.pros.length > 0 && (
         <ul className="space-y-0.5">
           {data.pros.slice(0, 2).map((p, i) => (
-            <li key={i} className="text-green-400 text-xs">
-              + {p}
-            </li>
+            <li key={i} className="text-green-400 text-xs">+ {p}</li>
           ))}
         </ul>
       )}
       {data.cons.length > 0 && (
         <ul className="space-y-0.5">
           {data.cons.slice(0, 2).map((c, i) => (
-            <li key={i} className="text-red-400 text-xs">
-              − {c}
-            </li>
+            <li key={i} className="text-red-400 text-xs">− {c}</li>
           ))}
         </ul>
       )}
@@ -91,7 +87,7 @@ function AmazonContent({ data }: { data: AmazonData }) {
     <div className="space-y-2">
       {data.star_rating != null && <StarRating rating={data.star_rating} />}
       {data.review_count != null && (
-        <p className="text-zinc-400 text-xs">{data.review_count.toLocaleString()} reviews</p>
+        <p className="text-white/40 text-xs">{data.review_count.toLocaleString()} reviews</p>
       )}
       <div className="flex gap-2">
         {data.is_amazon_choice && (
@@ -106,7 +102,7 @@ function AmazonContent({ data }: { data: AmazonData }) {
         )}
       </div>
       {data.common_complaints.length > 0 && (
-        <p className="text-zinc-500 text-xs line-clamp-2">{data.common_complaints[0]}</p>
+        <p className="text-white/30 text-xs line-clamp-2">{data.common_complaints[0]}</p>
       )}
     </div>
   );
@@ -114,7 +110,7 @@ function AmazonContent({ data }: { data: AmazonData }) {
 
 function RedditContent({ data }: { data: RedditData }) {
   return (
-    <p className="text-zinc-400 text-xs leading-relaxed line-clamp-4">
+    <p className="text-white/40 text-xs leading-relaxed line-clamp-4">
       {data.sentiment_summary || "No community data available."}
     </p>
   );
@@ -123,17 +119,26 @@ function RedditContent({ data }: { data: RedditData }) {
 type Props = {
   source: SourceName;
   state: SourceState;
+  productName?: string;
 };
 
-export function SourceCard({ source, state }: Props) {
-  const { label, icon } = SOURCE_META[source];
+export function SourceCard({ source, state, productName }: Props) {
+  const { label, url } = SOURCE_META[source];
   const verb = useCyclingText(LOADING_VERBS[source] ?? [], 2000);
 
+  const searchUrl = productName
+    ? `${url}/search?q=${encodeURIComponent(productName)}`
+    : url;
+
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 flex flex-col gap-3 min-h-[180px]">
+    <a
+      href={searchUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group glass rounded-xl p-4 sm:p-5 flex flex-col gap-2 sm:gap-3 min-h-[160px] sm:min-h-[180px] transition-all duration-200 ease-out hover:bg-white/[0.08] hover:border-white/[0.18] hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/40 active:bg-white/[0.1] cursor-pointer"
+    >
       <div className="flex items-center justify-between">
-        <span className="text-white font-semibold text-sm flex items-center gap-1.5">
-          <span>{icon}</span>
+        <span className="text-white/80 font-semibold text-sm transition-colors duration-200 group-hover:text-white">
           {label}
         </span>
         {state.status === "complete" && state.data && (
@@ -149,12 +154,12 @@ export function SourceCard({ source, state }: Props) {
 
       {(state.status === "loading" || state.status === "idle") && (
         <div className="flex-1 flex items-center">
-          <p className="text-zinc-500 text-xs italic transition-opacity duration-500">{verb}</p>
+          <p className="text-white/25 text-xs italic transition-opacity duration-500">{verb}</p>
         </div>
       )}
 
       {state.status === "error" && (
-        <p className="text-zinc-500 text-xs">Unable to retrieve</p>
+        <p className="text-white/25 text-xs">Unable to retrieve</p>
       )}
 
       {state.status === "complete" && state.data && (
@@ -167,6 +172,6 @@ export function SourceCard({ source, state }: Props) {
           {source === "reddit" && <RedditContent data={state.data as RedditData} />}
         </div>
       )}
-    </div>
+    </a>
   );
 }

@@ -51,11 +51,12 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center px-4">
+    <div className="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center px-4 py-8">
       <div className="w-full max-w-xl flex flex-col items-center gap-6">
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-white mb-2">review-me</h1>
-          <p className="text-zinc-400 text-lg">Should I buy it?</p>
+          <h1 className="app-title text-6xl sm:text-7xl font-bold tracking-tight select-none">
+            Signal
+          </h1>
         </div>
 
         <SearchInput onSubmit={handleSearch} loading={loading} />
@@ -65,15 +66,15 @@ export default function Home() {
         )}
 
         {clarification && (
-          <div className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl p-6 space-y-4">
-            <p className="text-zinc-300 text-sm">{clarification.question}</p>
+          <div className="w-full glass rounded-2xl p-6 space-y-4">
+            <p className="text-white/60 text-sm">{clarification.question}</p>
             <div className="flex flex-col gap-2">
               {clarification.candidates.map((candidate) => (
                 <button
                   key={candidate}
                   onClick={() => handleClarify(candidate)}
                   disabled={clarifyLoading}
-                  className="text-left bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl px-4 py-3 text-sm transition-colors disabled:opacity-50"
+                  className="text-left bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.08] hover:border-white/[0.16] text-white rounded-xl px-4 py-3 text-sm transition-all duration-150 disabled:opacity-50"
                 >
                   {candidate}
                 </button>

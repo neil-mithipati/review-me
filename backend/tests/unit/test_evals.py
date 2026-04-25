@@ -134,3 +134,24 @@ async def test_evals_run_for_all_four_sources(tmp_db):
     assert len(rows) == 12
     sources_seen = {r["source"] for r in rows}
     assert sources_seen == {"wirecutter", "cnet", "amazon", "reddit"}
+
+
+@pytest.mark.asyncio
+async def test_evals_run_for_errored_source(tmp_db):
+    """Evals must fire even when a source agent returns an error payload."""
+    claude = make_claude('{"label": "unrelated", "score": 0.0, "explanation": "no data"}')
+
+    from evals import run_evals, get_evals_for_review
+    await run_evals(
+        review_id="rev-err",
+        product="Dyson V15",
+        source="cnet",
+        source_data={"product_found": False, "error": "Website not supported"},
+        verdict="Consider",
+        confidence="low",
+        claude=claude,
+    )
+
+    rows = await get_evals_for_review("rev-err")
+    assert len(rows) == 3
+    assert all(r["source"] == "cnet" for r in rows)

@@ -1,7 +1,10 @@
 import asyncio
 import json
+import logging
 import os
 import uuid
+
+logger = logging.getLogger(__name__)
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from typing import Optional
@@ -123,10 +126,13 @@ async def resolve_category(query: str) -> tuple[bool, list[str]]:
     return False, []
 
 
+MAX_SOURCE_RETRIES = 1
+
+
 async def run_review(session: ReviewSession):
     product = session.product_name
 
-    async def run_source(source_name: str):
+    async def run_source(source_name: str, retries_remaining: int = MAX_SOURCE_RETRIES):
         try:
             result = await SOURCE_AGENTS[source_name](product, firecrawl_client, claude_client)
             session.source_status[source_name] = "complete"
@@ -135,8 +141,7 @@ async def run_review(session: ReviewSession):
                 "source_update",
                 {"source": source_name, "status": "complete", "data": result, "error": None},
             )
-            # Fire all three LLM judges in the background — non-blocking
-            asyncio.create_task(run_evals(
+            eval_results = await run_evals(
                 review_id=session.review_id,
                 product=product,
                 source=source_name,
@@ -144,7 +149,15 @@ async def run_review(session: ReviewSession):
                 verdict=result.get("verdict", "Consider"),
                 confidence=result.get("confidence", "low"),
                 claude=claude_client,
-            ))
+            )
+            # Retry if any eval scored 0 due to a genuine quality failure (not an API error)
+            any_failed = any(
+                r.get("score", 1.0) == 0.0 and r.get("label") != "error"
+                for r in eval_results.values()
+            )
+            if any_failed and retries_remaining > 0:
+                logger.info("Retrying source %s for %s — eval quality check failed", source_name, product)
+                await run_source(source_name, retries_remaining - 1)
         except Exception as e:
             session.source_status[source_name] = "error"
             session.source_error[source_name] = str(e)
@@ -152,6 +165,15 @@ async def run_review(session: ReviewSession):
                 "source_update",
                 {"source": source_name, "status": "error", "data": None, "error": str(e)},
             )
+            asyncio.create_task(run_evals(
+                review_id=session.review_id,
+                product=product,
+                source=source_name,
+                source_data={"product_found": False, "error": str(e)},
+                verdict="Consider",
+                confidence="low",
+                claude=claude_client,
+            ))
 
     await asyncio.gather(*[run_source(s) for s in SOURCES])
 

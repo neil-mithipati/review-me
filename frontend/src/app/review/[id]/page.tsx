@@ -83,17 +83,17 @@ export default function ReviewPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] py-8 px-4">
-      <div className="max-w-4xl mx-auto flex flex-col gap-6">
+    <div className="min-h-[calc(100vh-4rem)] py-5 sm:py-8 px-3 sm:px-4">
+      <div className="max-w-4xl mx-auto flex flex-col gap-4 sm:gap-6">
         <div className="flex justify-center">
           <SearchInput onSubmit={handleNewSearch} initialValue={productName} />
         </div>
 
         <VerdictCard verdict={verdict} productName={productName} />
 
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
           {SOURCES.map((source) => (
-            <SourceCard key={source} source={source} state={sources[source]} />
+            <SourceCard key={source} source={source} state={sources[source]} productName={productName} />
           ))}
         </div>
 

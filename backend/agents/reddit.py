@@ -4,20 +4,11 @@ import httpx
 import anthropic
 from firecrawl import FirecrawlApp
 from db.database import get_cached, set_cached
+from agents._loader import load_system_prompt
 
 SOURCE = "reddit"
 
-SYSTEM_PROMPT = """You are a product review analyst specializing in Reddit community sentiment.
-Analyze the Reddit posts about the given product.
-
-Return a JSON object with:
-- product_found: boolean (true if relevant posts were found)
-- sentiment_summary: 1-2 sentence summary of community opinion
-- verdict: "Buy", "Consider", or "Skip" based on overall sentiment
-- confidence: "high" (many posts, clear consensus), "medium" (moderate discussion), "low" (few posts or mixed)
-
-Focus on recent, high-score posts. Weight negative safety/quality issues heavily.
-Respond with a JSON object only, no explanation."""
+SYSTEM_PROMPT = load_system_prompt(SOURCE)
 
 
 async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnthropic) -> dict:

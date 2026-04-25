@@ -11,14 +11,16 @@ type Props = {
   reviewId: string;
 };
 
+const BASE_BTN = "w-full sm:w-auto flex items-center justify-center rounded-full font-semibold transition-all duration-150";
+
 const PRIMARY_STYLES: Record<string, string> = {
-  buy: "bg-green-500 hover:bg-green-400 text-white px-8 py-3 rounded-full text-base font-semibold",
-  consider: "bg-amber-500 hover:bg-amber-400 text-white px-8 py-3 rounded-full text-base font-semibold",
-  skip: "bg-red-500 hover:bg-red-400 text-white px-8 py-3 rounded-full text-base font-semibold",
+  buy:     `${BASE_BTN} bg-green-500/80 hover:bg-green-500 active:bg-green-600 backdrop-blur-sm border border-green-400/30 text-white px-8 py-3.5 text-base`,
+  consider:`${BASE_BTN} bg-amber-500/80 hover:bg-amber-500 active:bg-amber-600 backdrop-blur-sm border border-amber-400/30 text-white px-8 py-3.5 text-base`,
+  skip:    `${BASE_BTN} bg-red-500/80   hover:bg-red-500   active:bg-red-600   backdrop-blur-sm border border-red-400/30   text-white px-8 py-3.5 text-base`,
 };
 
 const SECONDARY_STYLE =
-  "border border-zinc-600 text-zinc-400 hover:text-zinc-200 hover:border-zinc-400 px-6 py-2 rounded-full text-sm transition-colors";
+  `${BASE_BTN} bg-white/[0.06] hover:bg-white/[0.12] active:bg-white/[0.18] backdrop-blur-sm border border-white/[0.1] hover:border-white/[0.2] text-white/60 hover:text-white px-6 py-3 text-sm`;
 
 export function ActionButtons({ verdictData, productName, reviewId }: Props) {
   const router = useRouter();
@@ -49,7 +51,7 @@ export function ActionButtons({ verdictData, productName, reviewId }: Props) {
   const isPrimary = (action: string) => recommended_action === action;
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-4">
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 w-full sm:w-auto">
       <button
         onClick={handleBuy}
         className={isPrimary("buy") ? PRIMARY_STYLES.buy : SECONDARY_STYLE}
@@ -61,12 +63,11 @@ export function ActionButtons({ verdictData, productName, reviewId }: Props) {
         onClick={handleConsider}
         disabled={wishlisted || wishlistLoading}
         className={
-          isPrimary("consider")
-            ? `${PRIMARY_STYLES.consider} disabled:opacity-60`
-            : `${SECONDARY_STYLE} disabled:opacity-60`
+          (isPrimary("consider") ? PRIMARY_STYLES.consider : SECONDARY_STYLE) +
+          " disabled:opacity-50"
         }
       >
-        {wishlisted ? "Added to Wishlist ★" : wishlistLoading ? "Adding…" : "Consider"}
+        {wishlisted ? "Added to Wishlist" : wishlistLoading ? "Adding…" : "Consider"}
       </button>
 
       <button
