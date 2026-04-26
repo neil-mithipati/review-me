@@ -4,33 +4,44 @@ from urllib.parse import quote_plus
 import anthropic
 from firecrawl import FirecrawlApp
 from db.database import get_cached, set_cached
-from agents._loader import load_system_prompt
 
 logger = logging.getLogger(__name__)
 
 SOURCE = "cnet"
 
-SYSTEM_PROMPT = load_system_prompt(SOURCE)
-
-VERDICT_TOOL = {
-    "name": "submit_verdict",
-    "description": "Submit the CNET review verdict for this product based on the search result snippets.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "product_found": {"type": "boolean"},
-            "source_url":    {"type": "string", "description": "Direct URL to the specific CNET review page"},
-            "overall_score": {"type": "number", "description": "Score from 0 to 10, if mentioned in the snippets"},
-            "pros":          {"type": "array", "items": {"type": "string"}},
-            "cons":          {"type": "array", "items": {"type": "string"}},
-            "verdict":       {"type": "string", "enum": ["Buy", "Consider", "Skip"]},
-            "confidence":    {"type": "string", "enum": ["high", "medium", "low"]},
-        },
-        "required": ["product_found", "verdict", "confidence"],
+EXTRACT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "product_found": {"type": "boolean"},
+        "overall_score": {"type": "number", "description": "Numeric score from 0 to 10"},
+        "pros":          {"type": "array", "items": {"type": "string"}},
+        "cons":          {"type": "array", "items": {"type": "string"}},
     },
+    "required": ["product_found"],
 }
 
 _FALLBACK_URL = "https://www.cnet.com/search/?query={}"
+
+
+def _apply_rules(raw: dict) -> tuple[str, str]:
+    if not raw.get("product_found"):
+        return "Consider", "low"
+    score = raw.get("overall_score")
+    if score is None:
+        return "Consider", "low"
+    if score >= 8.0:
+        return "Buy", "high"
+    if score >= 7.0:
+        return "Consider", "high"
+    if score >= 5.0:
+        return "Consider", "low"
+    return "Skip", "high"
+
+
+def _parse_data(raw) -> dict:
+    if isinstance(raw, list):
+        return raw[0] if raw else {}
+    return raw if isinstance(raw, dict) else {}
 
 
 async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnthropic) -> dict:
@@ -39,9 +50,9 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
         return cached
 
     fallback_url = _FALLBACK_URL.format(quote_plus(product))
-    snippets_text = ""
     top_review_url = fallback_url
 
+    # Step 1: Find the dedicated review page URL via search
     try:
         search_data = await asyncio.to_thread(
             firecrawl.search,
@@ -49,55 +60,47 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
         )
         items = search_data.web or []
 
-        rows = []
         for item in items[:6]:
             url = getattr(item, "url", "") or ""
-            title = getattr(item, "title", "") or ""
-            desc = getattr(item, "description", "") or ""
-            rows.append(f"URL: {url}\nTitle: {title}\nSnippet: {desc}")
-            # Use the first URL that looks like a dedicated review page
+            # Prefer dedicated /review/ pages; skip "best-X" roundups
             if top_review_url == fallback_url and "/review" in url and "best-" not in url:
                 top_review_url = url
 
-        # Fall back to the first result if no dedicated review page found
         if top_review_url == fallback_url and items:
             top_review_url = getattr(items[0], "url", fallback_url) or fallback_url
-
-        snippets_text = "\n\n".join(rows)
     except Exception as e:
         logger.warning("CNET search failed for '%s': %s", product, e)
 
-    message = await claude.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=512,
-        tools=[VERDICT_TOOL],
-        tool_choice={"type": "any"},
-        system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-        messages=[{
-            "role": "user",
-            "content": (
-                f"Product: {product}\n\n"
-                f"CNET search result snippets:\n"
-                f"{snippets_text if snippets_text else '(no results found)'}"
-            ),
-        }],
-    )
+    # Step 2: Extract structured review data from the actual page
+    raw = {}
+    if top_review_url != fallback_url:
+        try:
+            extract_result = await asyncio.to_thread(
+                firecrawl.extract,
+                urls=[top_review_url],
+                prompt=(
+                    f"Extract the CNET review for '{product}': "
+                    "the numeric overall score (0–10), list of pros, and list of cons."
+                ),
+                schema=EXTRACT_SCHEMA,
+            )
+            raw = _parse_data(extract_result.data if hasattr(extract_result, "data") else {})
+        except Exception as e:
+            logger.warning("CNET extract failed for '%s': %s", product, e)
 
-    tool_block = next((b for b in message.content if b.type == "tool_use"), None)
-    parsed = tool_block.input if tool_block else {
-        "product_found": False,
-        "verdict": "Consider",
-        "confidence": "low",
-    }
+    if not raw:
+        raw = {"product_found": top_review_url != fallback_url}
+
+    verdict, confidence = _apply_rules(raw)
 
     result = {
-        "product_found": parsed.get("product_found", False),
-        "source_url": parsed.get("source_url") or top_review_url,
-        "overall_score": parsed.get("overall_score"),
-        "pros": parsed.get("pros", []),
-        "cons": parsed.get("cons", []),
-        "verdict": parsed.get("verdict", "Consider"),
-        "confidence": parsed.get("confidence", "low"),
+        "product_found": raw.get("product_found", False),
+        "source_url": top_review_url,
+        "overall_score": raw.get("overall_score"),
+        "pros": raw.get("pros", []),
+        "cons": raw.get("cons", []),
+        "verdict": verdict,
+        "confidence": confidence,
     }
 
     await set_cached(product, SOURCE, result)
