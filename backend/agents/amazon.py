@@ -1,24 +1,12 @@
-import json
 import logging
-import re
 from urllib.parse import quote_plus
 import anthropic
 from firecrawl import FirecrawlApp
 from db.database import get_cached, set_cached
-from agents._loader import load_system_prompt
 
 logger = logging.getLogger(__name__)
 
-
-def _parse_json(text: str) -> dict:
-    text = text.strip()
-    text = re.sub(r"^```(?:json)?\s*", "", text)
-    text = re.sub(r"\s*```$", "", text)
-    return json.loads(text.strip())
-
 SOURCE = "amazon"
-
-SYSTEM_PROMPT = load_system_prompt(SOURCE)
 
 EXTRACT_SCHEMA = {
     "type": "object",
@@ -33,6 +21,34 @@ EXTRACT_SCHEMA = {
     },
     "required": ["product_found"],
 }
+
+_CONFIDENCE_UP = {"low": "medium", "medium": "high", "high": "high"}
+
+
+def _apply_rules(raw: dict) -> tuple[str, str]:
+    """Pure Python verdict mapping — mirrors the rules in amazon.md."""
+    if not raw.get("product_found"):
+        return "Consider", "low"
+
+    rating = raw.get("star_rating")
+    count = raw.get("review_count") or 0
+
+    if rating is None:
+        verdict, confidence = "Consider", "low"
+    elif rating >= 4.5 and count >= 500:
+        verdict, confidence = "Buy", "high"
+    elif rating >= 4.0 and count >= 100:
+        verdict, confidence = "Consider", "medium"
+    elif rating >= 4.0:
+        verdict, confidence = "Consider", "low"
+    else:
+        verdict, confidence = "Skip", "medium"
+
+    # Badges raise confidence one level but never change the verdict tier
+    if raw.get("is_amazon_choice") or raw.get("is_best_seller"):
+        confidence = _CONFIDENCE_UP[confidence]
+
+    return verdict, confidence
 
 
 def _parse_data(raw) -> dict:
@@ -56,32 +72,10 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
         )
         raw = _parse_data(extract_result.data if hasattr(extract_result, "data") else {})
     except Exception as e:
+        logger.warning("Amazon Firecrawl failed for '%s': %s", product, e)
         raw = {"product_found": False, "error": str(e)}
 
-    message = await claude.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=256,
-        system=[
-            {
-                "type": "text",
-                "text": SYSTEM_PROMPT,
-                "cache_control": {"type": "ephemeral"},
-            }
-        ],
-        messages=[
-            {
-                "role": "user",
-                "content": f"Product: {product}\nAmazon data: {json.dumps(raw)}",
-            }
-        ],
-    )
-
-    raw_text = message.content[0].text
-    try:
-        parsed = _parse_json(raw_text)
-    except (json.JSONDecodeError, IndexError, KeyError):
-        logger.warning("Amazon agent JSON parse failed for '%s'. Raw: %s", product, raw_text)
-        parsed = {"verdict": "Consider", "confidence": "low"}
+    verdict, confidence = _apply_rules(raw)
 
     result = {
         "product_found": raw.get("product_found", False),
@@ -91,8 +85,8 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
         "common_complaints": raw.get("common_complaints", []),
         "is_amazon_choice": raw.get("is_amazon_choice", False),
         "is_best_seller": raw.get("is_best_seller", False),
-        "verdict": parsed.get("verdict", "Consider"),
-        "confidence": parsed.get("confidence", "low"),
+        "verdict": verdict,
+        "confidence": confidence,
     }
 
     await set_cached(product, SOURCE, result)
