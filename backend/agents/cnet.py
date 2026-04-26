@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 from urllib.parse import quote_plus
 import anthropic
@@ -13,36 +12,25 @@ SOURCE = "cnet"
 
 SYSTEM_PROMPT = load_system_prompt(SOURCE)
 
-EXTRACT_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "product_found": {"type": "boolean"},
-        "source_url": {"type": "string", "description": "Direct URL to the specific CNET review page for this product"},
-        "overall_score": {"type": "number", "description": "Score from 0 to 10"},
-        "pros": {"type": "array", "items": {"type": "string"}},
-        "cons": {"type": "array", "items": {"type": "string"}},
-    },
-    "required": ["product_found"],
-}
-
 VERDICT_TOOL = {
     "name": "submit_verdict",
-    "description": "Submit the final Buy/Consider/Skip verdict for this product based on the CNET data.",
+    "description": "Submit the CNET review verdict for this product based on the search result snippets.",
     "input_schema": {
         "type": "object",
         "properties": {
-            "verdict":    {"type": "string", "enum": ["Buy", "Consider", "Skip"]},
-            "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+            "product_found": {"type": "boolean"},
+            "source_url":    {"type": "string", "description": "Direct URL to the specific CNET review page"},
+            "overall_score": {"type": "number", "description": "Score from 0 to 10, if mentioned in the snippets"},
+            "pros":          {"type": "array", "items": {"type": "string"}},
+            "cons":          {"type": "array", "items": {"type": "string"}},
+            "verdict":       {"type": "string", "enum": ["Buy", "Consider", "Skip"]},
+            "confidence":    {"type": "string", "enum": ["high", "medium", "low"]},
         },
-        "required": ["verdict", "confidence"],
+        "required": ["product_found", "verdict", "confidence"],
     },
 }
 
-
-def _parse_data(raw) -> dict:
-    if isinstance(raw, list):
-        return raw[0] if raw else {}
-    return raw if isinstance(raw, dict) else {}
+_FALLBACK_URL = "https://www.cnet.com/search/?query={}"
 
 
 async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnthropic) -> dict:
@@ -50,39 +38,64 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
     if cached:
         return cached
 
-    url = f"https://www.cnet.com/search/?query={quote_plus(product)}"
+    fallback_url = _FALLBACK_URL.format(quote_plus(product))
+    snippets_text = ""
+    top_review_url = fallback_url
+
     try:
-        extract_result = await asyncio.to_thread(
-            firecrawl.extract,
-            urls=[url],
-            prompt=f"Find the CNET review for '{product}'. Extract the overall score (0-10), pros, and cons.",
-            schema=EXTRACT_SCHEMA,
-            allow_external_links=True,
-            enable_web_search=True,
+        search_data = await asyncio.to_thread(
+            firecrawl.search,
+            f"site:cnet.com {product} review",
         )
-        raw = _parse_data(extract_result.data if hasattr(extract_result, "data") else {})
+        items = search_data.web or []
+
+        rows = []
+        for item in items[:6]:
+            url = getattr(item, "url", "") or ""
+            title = getattr(item, "title", "") or ""
+            desc = getattr(item, "description", "") or ""
+            rows.append(f"URL: {url}\nTitle: {title}\nSnippet: {desc}")
+            # Use the first URL that looks like a dedicated review page
+            if top_review_url == fallback_url and "/review" in url and "best-" not in url:
+                top_review_url = url
+
+        # Fall back to the first result if no dedicated review page found
+        if top_review_url == fallback_url and items:
+            top_review_url = getattr(items[0], "url", fallback_url) or fallback_url
+
+        snippets_text = "\n\n".join(rows)
     except Exception as e:
-        logger.warning("CNET Firecrawl failed for '%s': %s", product, e)
-        raw = {"product_found": False, "error": str(e)}
+        logger.warning("CNET search failed for '%s': %s", product, e)
 
     message = await claude.messages.create(
         model="claude-haiku-4-5-20251001",
-        max_tokens=256,
+        max_tokens=512,
         tools=[VERDICT_TOOL],
         tool_choice={"type": "any"},
         system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
-        messages=[{"role": "user", "content": f"Product: {product}\nCNET data: {json.dumps(raw)}"}],
+        messages=[{
+            "role": "user",
+            "content": (
+                f"Product: {product}\n\n"
+                f"CNET search result snippets:\n"
+                f"{snippets_text if snippets_text else '(no results found)'}"
+            ),
+        }],
     )
 
     tool_block = next((b for b in message.content if b.type == "tool_use"), None)
-    parsed = tool_block.input if tool_block else {"verdict": "Consider", "confidence": "low"}
+    parsed = tool_block.input if tool_block else {
+        "product_found": False,
+        "verdict": "Consider",
+        "confidence": "low",
+    }
 
     result = {
-        "product_found": raw.get("product_found", False),
-        "source_url": raw.get("source_url") or url,
-        "overall_score": raw.get("overall_score"),
-        "pros": raw.get("pros", []),
-        "cons": raw.get("cons", []),
+        "product_found": parsed.get("product_found", False),
+        "source_url": parsed.get("source_url") or top_review_url,
+        "overall_score": parsed.get("overall_score"),
+        "pros": parsed.get("pros", []),
+        "cons": parsed.get("cons", []),
         "verdict": parsed.get("verdict", "Consider"),
         "confidence": parsed.get("confidence", "low"),
     }
