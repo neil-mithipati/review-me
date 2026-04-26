@@ -58,7 +58,7 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
         raw = {"product_found": False, "error": str(e)}
 
     message = await claude.messages.create(
-        model="claude-sonnet-4-6",
+        model="claude-haiku-4-5-20251001",
         max_tokens=256,
         system=[
             {
