@@ -35,7 +35,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased text-white`}
       >
         <Header />
-        <main className="pt-[calc(3.25rem+env(safe-area-inset-top,0px))]">{children}</main>
+        <main>{children}</main>
       </body>
     </html>
   );

@@ -66,7 +66,7 @@ export default function ReviewPage() {
   }, []);
 
   return (
-    <div className="min-h-screen py-5 sm:py-8 px-3 sm:px-4">
+    <div className="min-h-screen pt-[calc(3.25rem+env(safe-area-inset-top,0px))] py-5 sm:py-8 px-3 sm:px-4">
       <div className="max-w-4xl mx-auto flex flex-col gap-4 sm:gap-6">
         <VerdictCard verdict={verdict} productName={productName} />
 

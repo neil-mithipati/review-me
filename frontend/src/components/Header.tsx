@@ -28,19 +28,23 @@ export function Header() {
     }
   }
 
+  if (!isReviewPage) {
+    return (
+      <div className="fixed top-[calc(1rem+env(safe-area-inset-top,0px))] right-4 z-40">
+        <WishlistButton />
+      </div>
+    );
+  }
+
   return (
     <header className="fixed top-0 left-0 right-0 z-40 flex items-center gap-3 px-4 sm:px-6 py-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] bg-black/30 backdrop-blur-2xl border-b border-white/[0.06]">
-      {isReviewPage && (
-        <>
-          <a href="/" className="app-title text-xl font-bold tracking-tight select-none shrink-0">
-            Signal
-          </a>
-          <div className="flex-1 min-w-0">
-            <SearchInput onSubmit={handleSearch} loading={loading} compact />
-          </div>
-        </>
-      )}
-      <div className={isReviewPage ? "shrink-0" : "ml-auto"}>
+      <a href="/" className="app-title text-xl font-bold tracking-tight select-none shrink-0">
+        Signal
+      </a>
+      <div className="flex-1 min-w-0">
+        <SearchInput onSubmit={handleSearch} loading={loading} compact />
+      </div>
+      <div className="shrink-0">
         <WishlistButton />
       </div>
     </header>
