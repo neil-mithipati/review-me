@@ -74,6 +74,8 @@ export type WishlistItem = {
 
 export type StartReviewResponse = {
   review_id: string;
+  short_id: string;
+  slug: string;
   status: "running" | "clarification_needed";
   candidates: string[] | null;
   clarification_question: string | null;

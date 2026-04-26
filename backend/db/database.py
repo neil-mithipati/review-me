@@ -35,6 +35,17 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS completed_reviews (
+                short_id     TEXT PRIMARY KEY,
+                slug         TEXT NOT NULL,
+                review_id    TEXT NOT NULL UNIQUE,
+                product_name TEXT NOT NULL,
+                source_data  TEXT NOT NULL,
+                verdict_data TEXT NOT NULL,
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         await db.commit()
 
 
@@ -94,6 +105,46 @@ async def add_to_wishlist(product_name: str, verdict: str, review_id: str) -> di
         ) as cur:
             row = await cur.fetchone()
             return dict(row)
+
+
+async def save_completed_review(
+    short_id: str,
+    slug: str,
+    review_id: str,
+    product_name: str,
+    source_data: dict,
+    verdict_data: dict,
+) -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT OR IGNORE INTO completed_reviews
+                (short_id, slug, review_id, product_name, source_data, verdict_data, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (short_id, slug, review_id, product_name, json.dumps(source_data), json.dumps(verdict_data), _now().isoformat()),
+        )
+        await db.commit()
+
+
+async def get_review_by_short_id(short_id: str) -> dict | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT short_id, slug, review_id, product_name, source_data, verdict_data FROM completed_reviews WHERE short_id = ?",
+            (short_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                return None
+            return {
+                "short_id": row["short_id"],
+                "slug": row["slug"],
+                "review_id": row["review_id"],
+                "product_name": row["product_name"],
+                "source_data": json.loads(row["source_data"]),
+                "verdict_data": json.loads(row["verdict_data"]),
+            }
 
 
 async def remove_from_wishlist(item_id: int) -> bool:

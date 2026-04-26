@@ -1,7 +1,10 @@
 import type {
   SSESourceUpdateEvent,
   SSEVerdictEvent,
+  SourceData,
+  SourceName,
   StartReviewResponse,
+  VerdictData,
   WishlistItem,
 } from "./types";
 
@@ -72,6 +75,17 @@ export async function clarifyReview(
     body: JSON.stringify({ choice }),
   });
   if (!res.ok) throw new Error(`Failed to clarify: ${res.statusText}`);
+  return res.json();
+}
+
+export type ReviewLookupResult =
+  | { status: "complete"; short_id: string; slug: string; review_id: string; product_name: string; source_data: Record<SourceName, SourceData>; verdict_data: VerdictData }
+  | { status: "loading"; short_id: string; slug: string; review_id: string; product_name: string };
+
+export async function getReviewById(shortId: string): Promise<ReviewLookupResult | null> {
+  const res = await fetch(`${BASE_URL}/api/review/id/${shortId}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error("Failed to fetch review");
   return res.json();
 }
 

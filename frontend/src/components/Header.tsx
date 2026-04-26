@@ -17,7 +17,7 @@ export function Header() {
     try {
       const res = await startReview(query);
       if (res.status === "running") {
-        router.push(`/review/${res.review_id}`);
+        router.push(`/review/${res.short_id}/${res.slug}`);
       } else {
         router.push("/");
       }

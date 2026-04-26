@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -21,9 +22,11 @@ from agents import amazon, cnet, orchestrator, reddit, wirecutter
 from evals import get_evals_for_review, run_evals
 from db.database import (
     add_to_wishlist,
+    get_review_by_short_id,
     get_wishlist,
     init_db,
     remove_from_wishlist,
+    save_completed_review,
 )
 
 load_dotenv()
@@ -60,6 +63,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def to_short_id(review_id: str) -> str:
+    return review_id.replace("-", "")[:8]
+
+
+def to_slug(product_name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", product_name.lower().strip()).strip("-")
+
+
 # In-memory review sessions
 reviews: dict[str, "ReviewSession"] = {}
 
@@ -68,6 +79,8 @@ reviews: dict[str, "ReviewSession"] = {}
 class ReviewSession:
     review_id: str
     product_name: str
+    short_id: str = ""
+    slug: str = ""
     source_status: dict = field(default_factory=lambda: {s: "loading" for s in SOURCES})
     source_data: dict = field(default_factory=lambda: {s: None for s in SOURCES})
     source_error: dict = field(default_factory=lambda: {s: None for s in SOURCES})
@@ -199,6 +212,19 @@ async def run_review(session: ReviewSession):
 
     session.broadcast_done()
 
+    if session.verdict_status == "complete" and session.verdict_data:
+        try:
+            await save_completed_review(
+                short_id=session.short_id,
+                slug=session.slug,
+                review_id=session.review_id,
+                product_name=session.product_name,
+                source_data=session.source_data,
+                verdict_data=session.verdict_data,
+            )
+        except Exception as e:
+            logger.warning("Failed to persist completed review %s: %s", session.review_id, e)
+
 
 # ── Routes ───────────────────────────────────────────────────────────────────
 
@@ -210,24 +236,30 @@ async def start_review(body: ReviewRequest):
 
     is_ambiguous, candidates = await resolve_category(query)
     review_id = str(uuid.uuid4())
+    short_id = to_short_id(review_id)
+    slug = to_slug(query)
 
     if is_ambiguous:
         # Store a pending session — no agents started yet
-        session = ReviewSession(review_id=review_id, product_name=query)
+        session = ReviewSession(review_id=review_id, product_name=query, short_id=short_id, slug=slug)
         reviews[review_id] = session
         return {
             "review_id": review_id,
+            "short_id": short_id,
+            "slug": slug,
             "status": "clarification_needed",
             "candidates": candidates,
             "clarification_question": f"Which '{query}' did you mean?",
         }
 
-    session = ReviewSession(review_id=review_id, product_name=query)
+    session = ReviewSession(review_id=review_id, product_name=query, short_id=short_id, slug=slug)
     reviews[review_id] = session
     asyncio.create_task(run_review(session))
 
     return {
         "review_id": review_id,
+        "short_id": short_id,
+        "slug": slug,
         "status": "running",
         "candidates": None,
         "clarification_question": None,
@@ -241,14 +273,36 @@ async def clarify_review(review_id: str, body: ClarifyRequest):
 
     session = reviews[review_id]
     session.product_name = body.choice.strip()
+    session.slug = to_slug(session.product_name)
     asyncio.create_task(run_review(session))
 
     return {
         "review_id": review_id,
+        "short_id": session.short_id,
+        "slug": session.slug,
         "status": "running",
         "candidates": None,
         "clarification_question": None,
     }
+
+
+@app.get("/api/review/id/{short_id}")
+async def get_review_by_id(short_id: str):
+    result = await get_review_by_short_id(short_id)
+    if result:
+        return {"status": "complete", **result}
+
+    for session in reviews.values():
+        if session.short_id == short_id:
+            return {
+                "status": session.verdict_status,
+                "review_id": session.review_id,
+                "short_id": session.short_id,
+                "slug": session.slug,
+                "product_name": session.product_name,
+            }
+
+    raise HTTPException(status_code=404, detail="Review not found")
 
 
 @app.get("/api/review/{review_id}/stream")

@@ -23,7 +23,7 @@ export default function Home() {
     try {
       const res = await startReview(query);
       if (res.status === "running") {
-        router.push(`/review/${res.review_id}`);
+        router.push(`/review/${res.short_id}/${res.slug}`);
       } else if (res.status === "clarification_needed") {
         setClarification({
           reviewId: res.review_id,
@@ -42,8 +42,8 @@ export default function Home() {
     if (!clarification) return;
     setClarifyLoading(true);
     try {
-      await clarifyReview(clarification.reviewId, choice);
-      router.push(`/review/${clarification.reviewId}`);
+      const res = await clarifyReview(clarification.reviewId, choice);
+      router.push(`/review/${res.short_id}/${res.slug}`);
     } catch {
       setError("Something went wrong.");
       setClarifyLoading(false);
