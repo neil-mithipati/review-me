@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { WishlistButton } from "@/components/WishlistButton";
+import { Header } from "@/components/Header";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,10 +34,8 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased text-white`}
       >
-        <div className="fixed top-[calc(1rem+env(safe-area-inset-top,0px))] right-4 z-40">
-          <WishlistButton />
-        </div>
-        <main>{children}</main>
+        <Header />
+        <main className="pt-[calc(3.25rem+env(safe-area-inset-top,0px))]">{children}</main>
       </body>
     </html>
   );

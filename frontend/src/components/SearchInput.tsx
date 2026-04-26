@@ -29,9 +29,10 @@ type Props = {
   onSubmit: (query: string) => void;
   initialValue?: string;
   loading?: boolean;
+  compact?: boolean;
 };
 
-export function SearchInput({ onSubmit, initialValue = "", loading = false }: Props) {
+export function SearchInput({ onSubmit, initialValue = "", loading = false, compact = false }: Props) {
   const [value, setValue] = useState(initialValue);
   const [placeholder, setPlaceholder] = useState("I'm feeling lucky");
 
@@ -51,7 +52,7 @@ export function SearchInput({ onSubmit, initialValue = "", loading = false }: Pr
   }
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-xl">
+    <form onSubmit={handleSubmit} className={compact ? "w-full" : "w-full max-w-xl"}>
       <div className="relative">
         <input
           type="text"
@@ -59,11 +60,15 @@ export function SearchInput({ onSubmit, initialValue = "", loading = false }: Pr
           onChange={(e) => setValue(e.target.value)}
           placeholder={placeholder}
           disabled={loading}
-          className="w-full bg-cyan-950/20 backdrop-blur-xl border border-cyan-500/20 text-cyan-50 placeholder-cyan-300/25 rounded-full px-6 py-4 text-base focus:outline-none focus:border-cyan-400/50 focus:bg-cyan-950/30 transition-all duration-150 disabled:opacity-50 pr-14"
+          className={
+            compact
+              ? "w-full bg-cyan-950/20 backdrop-blur-xl border border-cyan-500/20 text-cyan-50 placeholder-cyan-300/25 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-cyan-400/50 focus:bg-cyan-950/30 transition-all duration-150 disabled:opacity-50 pr-10"
+              : "w-full bg-cyan-950/20 backdrop-blur-xl border border-cyan-500/20 text-cyan-50 placeholder-cyan-300/25 rounded-full px-6 py-4 text-base focus:outline-none focus:border-cyan-400/50 focus:bg-cyan-950/30 transition-all duration-150 disabled:opacity-50 pr-14"
+          }
         />
         {loading && (
-          <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none">
-            <span className="inline-block w-4 h-4 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+          <div className={`absolute top-1/2 -translate-y-1/2 pointer-events-none ${compact ? "right-3" : "right-5"}`}>
+            <span className={`inline-block border-2 border-white/20 border-t-white/60 rounded-full animate-spin ${compact ? "w-3 h-3" : "w-4 h-4"}`} />
           </div>
         )}
       </div>

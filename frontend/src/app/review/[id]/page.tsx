@@ -1,12 +1,11 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ActionButtons } from "@/components/ActionButtons";
-import { SearchInput } from "@/components/SearchInput";
 import { SourceCard } from "@/components/SourceCard";
 import { VerdictCard } from "@/components/VerdictCard";
-import { clarifyReview, startReview, streamReview } from "@/lib/api";
+import { streamReview } from "@/lib/api";
 import type { SourceName, SourceState, VerdictState } from "@/lib/types";
 
 const SOURCES: SourceName[] = ["wirecutter", "cnet", "amazon", "reddit"];
@@ -20,7 +19,6 @@ const initialSources = (): Record<SourceName, SourceState> => ({
 
 export default function ReviewPage() {
   const params = useParams();
-  const router = useRouter();
   const reviewId = params.id as string;
 
   const [productName, setProductName] = useState("");
@@ -67,28 +65,9 @@ export default function ReviewPage() {
     if (name) setProductName(decodeURIComponent(name));
   }, []);
 
-  async function handleNewSearch(query: string) {
-    cleanupRef.current?.();
-    try {
-      const res = await startReview(query);
-      if (res.status === "running") {
-        router.push(`/review/${res.review_id}`);
-      } else if (res.status === "clarification_needed" && res.candidates?.length) {
-        // Navigate home with clarification state
-        router.push("/");
-      }
-    } catch {
-      router.push("/");
-    }
-  }
-
   return (
-    <div className="min-h-[calc(100vh-4rem)] py-5 sm:py-8 px-3 sm:px-4">
+    <div className="min-h-screen py-5 sm:py-8 px-3 sm:px-4">
       <div className="max-w-4xl mx-auto flex flex-col gap-4 sm:gap-6">
-        <div className="flex justify-center">
-          <SearchInput onSubmit={handleNewSearch} initialValue={productName} />
-        </div>
-
         <VerdictCard verdict={verdict} productName={productName} />
 
         <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
