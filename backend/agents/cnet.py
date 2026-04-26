@@ -1,6 +1,6 @@
+import asyncio
 import json
 import logging
-import re
 from urllib.parse import quote_plus
 import anthropic
 from firecrawl import FirecrawlApp
@@ -8,13 +8,6 @@ from db.database import get_cached, set_cached
 from agents._loader import load_system_prompt
 
 logger = logging.getLogger(__name__)
-
-
-def _parse_json(text: str) -> dict:
-    text = text.strip()
-    text = re.sub(r"^```(?:json)?\s*", "", text)
-    text = re.sub(r"\s*```$", "", text)
-    return json.loads(text.strip())
 
 SOURCE = "cnet"
 
@@ -32,6 +25,19 @@ EXTRACT_SCHEMA = {
     "required": ["product_found"],
 }
 
+VERDICT_TOOL = {
+    "name": "submit_verdict",
+    "description": "Submit the final Buy/Consider/Skip verdict for this product based on the CNET data.",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "verdict":    {"type": "string", "enum": ["Buy", "Consider", "Skip"]},
+            "confidence": {"type": "string", "enum": ["high", "medium", "low"]},
+        },
+        "required": ["verdict", "confidence"],
+    },
+}
+
 
 def _parse_data(raw) -> dict:
     if isinstance(raw, list):
@@ -46,7 +52,8 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
 
     url = f"https://www.cnet.com/search/?query={quote_plus(product)}"
     try:
-        extract_result = firecrawl.extract(
+        extract_result = await asyncio.to_thread(
+            firecrawl.extract,
             urls=[url],
             prompt=f"Find the CNET review for '{product}'. Extract the overall score (0-10), pros, and cons.",
             schema=EXTRACT_SCHEMA,
@@ -55,32 +62,20 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
         )
         raw = _parse_data(extract_result.data if hasattr(extract_result, "data") else {})
     except Exception as e:
+        logger.warning("CNET Firecrawl failed for '%s': %s", product, e)
         raw = {"product_found": False, "error": str(e)}
 
     message = await claude.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=256,
-        system=[
-            {
-                "type": "text",
-                "text": SYSTEM_PROMPT,
-                "cache_control": {"type": "ephemeral"},
-            }
-        ],
-        messages=[
-            {
-                "role": "user",
-                "content": f"Product: {product}\nCNET data: {json.dumps(raw)}",
-            }
-        ],
+        tools=[VERDICT_TOOL],
+        tool_choice={"type": "any"},
+        system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+        messages=[{"role": "user", "content": f"Product: {product}\nCNET data: {json.dumps(raw)}"}],
     )
 
-    raw_text = message.content[0].text
-    try:
-        parsed = _parse_json(raw_text)
-    except (json.JSONDecodeError, IndexError, KeyError):
-        logger.warning("CNET agent JSON parse failed for '%s'. Raw: %s", product, raw_text)
-        parsed = {"verdict": "Consider", "confidence": "low"}
+    tool_block = next((b for b in message.content if b.type == "tool_use"), None)
+    parsed = tool_block.input if tool_block else {"verdict": "Consider", "confidence": "low"}
 
     result = {
         "product_found": raw.get("product_found", False),

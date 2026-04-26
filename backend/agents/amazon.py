@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from urllib.parse import quote_plus
 import anthropic
@@ -64,7 +65,8 @@ async def run(product: str, firecrawl: FirecrawlApp, claude: anthropic.AsyncAnth
 
     url = f"https://www.amazon.com/s?k={quote_plus(product)}"
     try:
-        extract_result = firecrawl.extract(
+        extract_result = await asyncio.to_thread(
+            firecrawl.extract,
             urls=[url],
             prompt=f"Find the top Amazon listing for '{product}'. Extract the star rating, number of reviews, common complaints from reviews, and whether it has Amazon's Choice or Best Seller badge.",
             schema=EXTRACT_SCHEMA,
